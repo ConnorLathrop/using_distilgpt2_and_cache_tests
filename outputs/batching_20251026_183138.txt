@@ -1,0 +1,6 @@
+Batch size=1  | p50=0.530s | p95=0.530s | Total time taken: 0.5297114849090576
+ Throughput=120.8 tok/s | 1.89 prompts/s | GPU util=0.0% | Mem used=1.0 %
+Batch size=2  | p50=0.270s | p95=0.270s | Total time taken: 0.5391523838043213
+ Throughput=237.4 tok/s | 3.71 prompts/s | GPU util=34.0% | Mem used=24.0 %
+Batch size=4  | p50=0.271s | p95=0.274s | Total time taken: 1.084641695022583
+ Throughput=236.0 tok/s | 3.69 prompts/s | GPU util=36.5% | Mem used=24.0 %

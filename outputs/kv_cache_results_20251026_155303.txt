@@ -1,0 +1,4 @@
+tokens used: 32
+ use_cache=True | total_time=0.62s | tokens/sec=51.9 | mem_used=8.75048828125 
+tokens used: 32
+ use_cache=False | total_time=0.14s | tokens/sec=231.9 | mem_used=0.00048828125 
