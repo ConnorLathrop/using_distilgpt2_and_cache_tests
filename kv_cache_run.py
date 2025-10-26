@@ -7,8 +7,6 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 model = AutoModelForCausalLM.from_pretrained(MODEL_NAME).to("cuda")
 model.eval()
 
-prompts = []
-
 prompt = "What I learned in boating school is"
 inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
 
@@ -33,3 +31,4 @@ for use_cache in [True, False]:
     results.append(f"tokens used: {num_tokens}\n {r}")
 
 save_output(f"kv_cache_results_{timestamp()}.txt", "\n".join(results))
+
