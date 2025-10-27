@@ -1,0 +1,114 @@
+When using pynvml my memory usage after running a model.generate is lower than expected
+Good observation — that’s actually a fairly common situation when measuring GPU memory with `pynvml`.
+
+Let’s go through **why this happens** and what you can check to confirm what’s going on.
+
+---
+
+### 🧠 What’s likely happening
+
+After you call `model.generate(...)`:
+
+1. **PyTorch frees temporary allocations** used during generation (e.g., activations, attention caches, or buffers).
+
+   * PyTorch uses a **caching allocator** for GPU memory.
+   * After generation, some memory may be released back to PyTorch’s pool, **but not to the GPU driver**, so `pynvml` may show **lower or unchanged** memory usage depending on timing and caching state.
+
+2. **Lazy synchronization:**
+   If you check memory usage immediately after `generate()` but before calling `torch.cuda.synchronize()`, some kernels may not have finished. Memory stats can therefore be misleadingly low.
+
+3. **`model.generate` offloads tensors to CPU** when `use_cache=False` or for certain sampling settings (like beam search with logits processors). This reduces GPU usage dynamically.
+
+4. **`pynvml` reports total allocated memory by CUDA driver**, not necessarily what PyTorch is caching internally.
+
+---
+
+### ✅ How to measure GPU memory correctly
+
+Here are a few reliable methods:
+
+#### 1. Force synchronization
+
+```python
+torch.cuda.synchronize()
+```
+
+Then check:
+
+```python
+import pynvml
+pynvml.nvmlInit()
+handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+print(f"Used memory: {info.used / 1024**2:.2f} MB")
+```
+
+#### 2. Use PyTorch’s own allocator stats
+
+```python
+print(f"Allocated: {torch.cuda.memory_allocated() / 1e6:.1f} MB")
+print(f"Reserved: {torch.cuda.memory_reserved() / 1e6:.1f} MB")
+```
+
+* **`allocated`** = tensors currently holding memory.
+* **`reserved`** = memory held in PyTorch’s pool, even if unused.
+
+This usually gives a clearer picture than `pynvml`.
+
+#### 3. Profile peak usage
+
+If you want the **maximum memory** used during generation:
+
+```python
+torch.cuda.reset_peak_memory_stats()
+_ = model.generate(...)
+torch.cuda.synchronize()
+print(f"Peak memory: {torch.cuda.max_memory_allocated() / 1e6:.1f} MB")
+```
+
+---
+
+### 🔍 Example reason your number looks “too low”
+
+Let’s say:
+
+* Model loads = 500 MB
+* Generate uses 1.5 GB at peak
+* After generation, activations are freed, leaving only the model weights.
+
+Then `pynvml` might show:
+
+```
+Before: 500 MB
+During: 2000 MB
+After: 600 MB
+```
+
+So if you only check **after**, it looks “lower than expected,” but that’s because temporary buffers were released.
+
+---
+
+### 🧩 If you want to *see* the full memory curve
+
+You can sample during generation:
+
+```python
+import time
+
+mems = []
+for _ in range(10):
+    info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+    mems.append(info.used / 1e6)
+    time.sleep(0.1)
+
+print(mems)
+```
+
+Or better yet, wrap generation in `torch.profiler` to record memory usage dynamically.
+
+---
+
+If you want, you can share your measurement code — I can help you adjust it so you get accurate readings for both **active** and **peak** GPU memory during `generate()`. Would you like me to?
+
+
+  This helped me use the peak memory to examine how much memory was being used when running the models
